@@ -446,11 +446,19 @@ Métricas Base:
 >
 > **v2** com Role Prompting + Few-Shot (3 exemplos) + Chain of Thought (6 passos de análise) + Skeleton of Thought (3 templates de saída) atingiu aprovação na primeira rodada de avaliação.
 
-### Screenshots
+### Screenshots e Evidências no LangSmith
 
 **Dataset de avaliação — 15 exemplos no LangSmith (`-eval`)**
 
+- Dataset público: https://smith.langchain.com/public/024b5b19-711b-41ca-9ef4-ca07e85d975b/d
+
 ![Dataset de avaliação com 15 exemplos](images/evals.png)
+
+**Tracing detalhado — 3 exemplos de execução**
+
+- Exemplo 1 (bug simples): https://smith.langchain.com/public/fc447a84-c1b9-4def-9f64-cc383debb024/r/5a64bfc7-3e7e-4d7d-8aef-071719b77a40
+- Exemplo 2 (bug médio): https://smith.langchain.com/public/1f8f98c4-0a1b-42b3-aad0-655b7e4cebf1/r/f9122b85-cf95-4c6d-b1db-4dc53c46014f
+- Exemplo 3 (bug complexo): https://smith.langchain.com/public/1380860c-6b1c-48c9-bcfb-0bfae01e68af/r/d221979e-0e8c-4e67-a8c9-d1136b3b9347
 
 **Prompt publicado publicamente:**
 https://smith.langchain.com/hub/nathangds/bug_to_user_story_v2
