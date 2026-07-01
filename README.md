@@ -325,6 +325,185 @@ python src/evaluate.py
 
 ---
 
+---
+
+## Técnicas Aplicadas (Fase 2)
+
+### 1. Role Prompting
+
+**Técnica**: O system prompt define o modelo como *"Product Manager Sênior e Agile Coach com 10 anos de experiência"*.
+
+**Por que**: Role Prompting reduz ambiguidade semântica antes da tarefa ser descrita. Ao fixar o papel, o modelo restringe interpretações abertas e gera respostas com estilo, tom e escopo coerentes com um PM real — focando em valor de negócio ao invés de jargão técnico. Essa técnica é especialmente efetiva para controlar o tom (profissional, empático) avaliado pelas métricas de Tone Score e User Story Format Score.
+
+**Como aplicado**:
+```
+"Você é um Product Manager Sênior e Agile Coach com 10 anos de experiência em
+times de engenharia de software. Sua especialidade é transformar relatos de bugs
+em User Stories claras, empáticas e acionáveis..."
+```
+
+---
+
+### 2. Few-Shot Learning (obrigatório)
+
+**Técnica**: 3 exemplos completos de input→output no system prompt, cobrindo os três níveis de complexidade do dataset: simples, médio e complexo.
+
+**Por que**: Few-shot ensina o padrão esperado — formato, vocabulário e nível de detalhe — sem depender apenas de descrição textual das regras. Combinar few-shot com restrições explícitas no system prompt (regra das notas do curso) garante que o modelo aprenda tanto a estrutura quanto os limites do que pode gerar. 3 exemplos é o ponto ideal: suficiente para o padrão ser aprendido, sem introduzir ambiguidade entre âncoras competidoras.
+
+**Como aplicado**:
+- Exemplo 1: bug simples de validação → user story concisa com 5 critérios
+- Exemplo 2: bug médio (webhook) com detalhes técnicos → user story + seção "Contexto Técnico"
+- Exemplo 3: bug complexo (Android ANR) → user story + critérios técnicos + contexto do bug
+
+---
+
+### 3. Chain of Thought (CoT)
+
+**Técnica**: O system prompt instrui o modelo a analisar explicitamente o bug em 6 passos antes de escrever a User Story, sob o título `Análise:`. Os few-shot examples mostram esse raciocínio em ação.
+
+**Por que**: CoT força o modelo a raciocinar sobre tipo do bug, persona afetada, impacto no negócio e complexidade antes de gerar output. Sem análise prévia, o modelo tende a espelhar o bug report em vez de transformá-lo em valor de usuário — o que prejudica diretamente Correctness, Completeness e Tone Score. Mostrar o raciocínio nos exemplos (few-shot + CoT combinados) é mais eficaz do que apenas instruir verbalmente.
+
+**Como aplicado**:
+```
+Antes de escrever a User Story, raciocine passo a passo:
+1. TIPO DO BUG: Classifique...
+2. PERSONA AFETADA: Quem sofre o impacto?
+3. IMPACTO NO NEGÓCIO: O que o usuário perde?
+4. COMPLEXIDADE: Simples / Médio / Complexo
+5. DADOS TÉCNICOS RELEVANTES: O que preservar?
+6. ESTRUTURA DE SAÍDA: Qual skeleton usar?
+```
+
+---
+
+### 4. Skeleton of Thought
+
+**Técnica**: O system prompt define três esqueletos de saída distintos (simples / médio / complexo), com marcadores explícitos para cada seção.
+
+**Por que**: Definir a estrutura de saída antes da execução impede que o modelo invente formatos. Cada esqueleto funciona como um contrato de entrega — o modelo sabe exatamente quais seções incluir dependendo da complexidade do bug. Isso melhora diretamente as métricas de Clarity (organização estrutural), Acceptance Criteria Score (formato Given-When-Then) e Completeness Score (seções técnicas nos bugs complexos).
+
+**Como aplicado**:
+```
+### Bugs Simples: título + critérios Given-When-Then
+### Bugs Médios: título + critérios + Contexto Técnico
+### Bugs Complexos: título + seções nomeadas A/B/C + Contexto Técnico + Tasks Técnicas
+```
+
+---
+
+### Por que essas quatro técnicas juntas?
+
+| Técnica | Problema que resolve |
+|---------|---------------------|
+| Role Prompting | Tom genérico, falta de empatia, persona vaga |
+| Few-Shot Learning | Formato inconsistente, vocabulário fora do padrão |
+| Chain of Thought | Bug espelhado sem transformação em valor de usuário |
+| Skeleton of Thought | Estrutura imprevisível, seções faltando em bugs complexos |
+
+---
+
+## Resultados Finais
+
+### Prompt publicado no LangSmith Hub
+
+- **URL pública:** https://smith.langchain.com/hub/nathangds/bug_to_user_story_v2
+- **Dataset de avaliação:** 15 exemplos (5 simples, 7 médios, 3 complexos)
+- **Modelos utilizados:** `gpt-4o-mini` (geração) + `gpt-4o` (avaliação LLM-as-Judge)
+
+### Saída do terminal (`python src/evaluate.py`)
+
+```
+==================================================
+Prompt: nathangds/bug_to_user_story_v2
+==================================================
+
+Métricas Derivadas:
+  - Helpfulness: 0.89 ✓
+  - Correctness: 0.85 ✓
+
+Métricas Base:
+  - F1-Score: 0.81 ✓
+  - Clarity: 0.89 ✓
+  - Precision: 0.89 ✓
+
+📊 MÉDIA GERAL: 0.8681
+
+✅ STATUS: APROVADO - Todas as métricas >= 0.8
+```
+
+### Tabela comparativa: v1 (baseline) vs v2 (otimizado)
+
+| Métrica | v1 (baseline) | v2 (otimizado) | Melhora | Status |
+|---------|:-------------:|:--------------:|:-------:|:------:|
+| Helpfulness | 0.45 | **0.89** | +0.44 | ✅ |
+| Correctness | 0.52 | **0.85** | +0.33 | ✅ |
+| F1-Score | 0.48 | **0.81** | +0.33 | ✅ |
+| Clarity | 0.50 | **0.89** | +0.39 | ✅ |
+| Precision | 0.46 | **0.89** | +0.43 | ✅ |
+| **Média** | **0.48** | **0.87** | **+0.39** | ✅ |
+
+> **v1** não tinha persona, sem exemplos, sem formato de saída, sem análise do bug — o modelo espelhava o bug report em vez de transformá-lo em valor de usuário.
+>
+> **v2** com Role Prompting + Few-Shot (3 exemplos) + Chain of Thought (6 passos de análise) + Skeleton of Thought (3 templates de saída) atingiu aprovação na primeira rodada de avaliação.
+
+### Screenshots
+
+**Dataset de avaliação — 15 exemplos no LangSmith (`-eval`)**
+
+![Dataset de avaliação com 15 exemplos](images/evals.png)
+
+**Prompt publicado publicamente:**
+https://smith.langchain.com/hub/nathangds/bug_to_user_story_v2
+
+---
+
+## Como Executar
+
+### Pré-requisitos
+
+- Python 3.9+
+- Conta no LangSmith com API Key
+- API Key do Google (Gemini) ou OpenAI
+
+### Instalação
+
+```bash
+python -m venv venv
+venv\Scripts\activate   # Windows
+pip install -r requirements.txt
+```
+
+### Configuração
+
+Copie `.env.example` para `.env` e preencha:
+
+```env
+LANGSMITH_API_KEY=...
+USERNAME_LANGSMITH_HUB=seu_username
+GOOGLE_API_KEY=...   # ou OPENAI_API_KEY
+LLM_PROVIDER=google
+LLM_MODEL=gemini-2.5-flash
+EVAL_MODEL=gemini-2.5-flash
+```
+
+### Execução
+
+```bash
+# 1. Pull do prompt base do LangSmith
+python src/pull_prompts.py
+
+# 2. Push do prompt otimizado
+python src/push_prompts.py
+
+# 3. Avaliação
+python src/evaluate.py
+
+# 4. Testes de validação
+pytest tests/test_prompts.py
+```
+
+---
+
 ## Dicas Finais
 
 - **Lembre-se da importância da especificidade, contexto e persona** ao refatorar prompts
